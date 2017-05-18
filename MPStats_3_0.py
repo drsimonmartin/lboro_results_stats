@@ -4,25 +4,6 @@
 Created on Tue May 16 11:09:32 2017
 
 @author: simonmartin
-Copyright (c) 2017 Simon Martin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 """
 import pandas as pd # Pandas use here for easy manipulation of data files
 import numpy as np
@@ -143,7 +124,7 @@ def HistoModule(filename='Module Marks.xls',module_name='',bins=20,elements=Fals
         DataF.plot.hist(alpha=0.25,bins=bins,stacked=False,sort_columns=False,color=['r','g','b'],range=(0,100))
     return
 
-def HistoArray(filename='Module Marks.xls',module_list=[],bins=20,elements=False,rowmax=6,debug=False):
+def HistoArray(filename='Module Marks.xls',module_list=[],bins=20,elements=False,debug=False):
     """creates a pandas histogram of the results for specified module
         Inputs: 
             filename is an excelfile from LUSI system includes Module marks and programmes
@@ -170,16 +151,50 @@ def HistoArray(filename='Module Marks.xls',module_list=[],bins=20,elements=False
     # check to see if module list has values, otherwise go over all modules
     if (module_list==[]):
         # Now pull out list of modules – search "Module Code" column for unique values.
-        module_list=df.Module_Code.unique()
+        module_list=list(df.Module_Code.unique()) # see: https://chrisalbon.com/python/pandas_find_unique_values.html
     if debug==True : print ((module_list) )
     if debug==True : print (len(module_list) )
-    nModules=len(module_list)
     # now work out dimensions of array
-    nRows,nCols=Geometry(nModules,rowmax)
     #f, axarr = plt.subplots(nrows=nRows,ncols=nCols, sharex=True) # setup an array in which to put the plots
     #build a dataframe of result data frames then plot array using by keyword
-    df2=pd.DataFrame()
+    df2=df.loc[df['Module_Code'].isin(module_list)]
+    print (df2)
     #for idx,module in enumerate(module_list):
         #df2=df2.append({'Module':df["Module_Mark"][(df["Module_Code"] == module)]})
-    df['Module_Mark'].hist(by=df['Module_Code'])
+    df2['Module_Mark'].hist(bins=bins,by=df['Module_Code'])
+    return
+
+def ProgPartHist(filename='Module Marks.xls',programme_list=[],part_list=[],module_list=[],bins=20,elements=False,debug=False):
+    """ creates array of histograms of modules for given programmes/parts/modules
+        if the lists are blank then it will go through everything"""
+    # read in the LUSI spreadsheet
+    df=pd.read_excel(filename,skiprows=[0,1]) # have the LUSI file in df
+    # some of the column names (may) have spaces. This is sometimes a problem in Pandas. Replace space with underscore
+    cols = df.columns
+    cols = cols.map(lambda x: x.replace(' ', '_') if isinstance(x, (str)) else x) # code based on: https://github.com/pandas-dev/pandas/issues/6508
+    df.columns = cols
+    # check to see if programme list or part have values, of not set to all
+    if (programme_list==[] and part_list==[]):
+        # assume that user wants all programmes and parts
+        programme_list=list(df.Programme_Code.unique())
+        part_list=list(df.Part.unique())
+    if (module_list==[]): module_list=list(df.Module_Code.unique())# list of all modules as default
+    #generate required array(s) and display
+    if (programme_list==[]): # no programme list so go through producing summaries of each part in part_list
+        for part in part_list:
+            df2=df.loc[df['Part']==part]
+            df3=df2.loc[df2['Module_Code'].isin(module_list)]
+            df3['Module_Mark'].hist(bins=bins,by=df3['Module_Code'],range=(0,100))
+    else: # have a list of programmes to go through
+        if (part_list==[]):part_list=list(df.Part.unique())
+        for programme in programme_list:
+            print('prog=',programme)
+            df2=df.loc[df['Programme_Code']==programme]
+            for part in part_list:
+                df3=df2.loc[df['Part']==part]
+                df4=df3.loc[df3['Module_Code'].isin(module_list)]
+                if not df4.empty:
+                    df4['Module_Mark'].hist(bins=bins,by=df4['Module_Code'],range=(0,100))
+                else:
+                    print('No data to histogram. Check input lists')
     return
